@@ -1,0 +1,39 @@
+spring:
+  config:
+    activate:
+      on-profile: dev
+
+  # Local Docker Infrastructure
+  datasource:
+    url: jdbc:postgresql://localhost:5432/groceryscout
+    username: postgres
+    password: root
+  
+  jpa:
+    hibernate:
+      ddl-auto: update
+    show-sql: false
+
+  # Redis (Local)
+  data:
+    redis:
+      host: localhost
+      port: 6379
+
+  # Kafka (Local - optional)
+  kafka:
+    bootstrap-servers: localhost:9092
+    consumer:
+      group-id: grocery-scout-group
+      auto-offset-reset: earliest
+
+# AI Integration
+gemini:
+  api:
+    key: ${GEMINI_API_KEY:YOUR_GEMINI_API_KEY_HERE}
+    model: gemini-2.5-flash
+
+logging:
+  level:
+    root: INFO
+    com.groceryscout.backend: DEBUG

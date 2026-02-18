@@ -1,0 +1,44 @@
+# --- OS & IDE Files ---
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.iml
+*.log
+.classpath
+.project
+.settings/
+
+# --- Backend (Java/Spring Boot/Maven) ---
+target/
+backend/target/
+!.mvn/wrapper/maven-wrapper.jar
+**/*.class
+pom.xml.tag
+*.jar
+*.war
+backend/help.md
+
+# --- Frontend (Node/React) ---
+node_modules/
+frontend/node_modules/
+dist/
+frontend/dist/
+build/
+frontend/build/
+.env
+.env.local
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# --- Container Data ---
+# If you mount host volumes in docker-compose, ignore them here
+# (Technically usually named volumes are managed by Docker, but if local folders are used:)
+postgres_data/
+redis_data/
+kafka_data/
+
+# --- Secrets & Sensitive Config ---
+# Ignore local dev properties if they contain real secrets
+# backend/src/main/resources/application-local.yml
