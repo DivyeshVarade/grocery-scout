@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import api from '../../api/axios';
-import { ChevronDown, ChevronUp } from 'lucide-react';
+import { ChevronDown, ChevronUp, Eye } from 'lucide-react';
+import OrderDetailsModal from '../../components/OrderDetailsModal';
 
 const COLUMNS = ['PENDING', 'PROCESSING', 'DELIVERED'];
 const COL_CONFIG = {
@@ -13,6 +14,7 @@ export default function ManagerOrders() {
     const [orders, setOrders] = useState([]);
     const [loading, setLoading] = useState(true);
     const [expandedOrders, setExpandedOrders] = useState({});
+    const [selectedOrder, setSelectedOrder] = useState(null);
 
     const fetchOrders = async (showLoader = false) => {
         if (showLoader) setLoading(true);
@@ -118,15 +120,24 @@ export default function ManagerOrders() {
                                             <span className="text-xs text-gray-400">
                                                 {order.items?.length || 0} Items
                                             </span>
-                                            <select
-                                                value={order.status}
-                                                onChange={(e) => updateStatus(order.id, e.target.value)}
-                                                className="text-xs px-2 py-1 rounded-lg border border-green-200 text-green-700 bg-green-50 font-medium cursor-pointer focus:outline-none"
-                                                onClick={(e) => e.stopPropagation()}
-                                            >
-                                                {COLUMNS.map(s => <option key={s} value={s}>{s === 'DELIVERED' ? 'Mark Delivered' : s}</option>)}
-                                                <option value="CANCELLED">Cancel</option>
-                                            </select>
+                                            <div className="flex items-center gap-2">
+                                                <button
+                                                    onClick={(e) => { e.stopPropagation(); setSelectedOrder(order); }}
+                                                    className="flex items-center gap-1 text-xs px-2 py-1 rounded-lg border border-blue-200 text-blue-700 bg-blue-50 font-medium cursor-pointer hover:bg-blue-100 transition-colors"
+                                                >
+                                                    <Eye size={12} />
+                                                    View
+                                                </button>
+                                                <select
+                                                    value={order.status}
+                                                    onChange={(e) => updateStatus(order.id, e.target.value)}
+                                                    className="text-xs px-2 py-1 rounded-lg border border-green-200 text-green-700 bg-green-50 font-medium cursor-pointer focus:outline-none"
+                                                    onClick={(e) => e.stopPropagation()}
+                                                >
+                                                    {COLUMNS.map(s => <option key={s} value={s}>{s === 'DELIVERED' ? 'Mark Delivered' : s}</option>)}
+                                                    <option value="CANCELLED">Cancel</option>
+                                                </select>
+                                            </div>
                                         </div>
                                     </div>
                                 ))}
@@ -138,6 +149,14 @@ export default function ManagerOrders() {
                     );
                 })}
             </div>
+
+            {/* Order Details Modal */}
+            {selectedOrder && (
+                <OrderDetailsModal
+                    order={selectedOrder}
+                    onClose={() => setSelectedOrder(null)}
+                />
+            )}
         </div>
     );
 }

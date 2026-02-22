@@ -4,11 +4,10 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.groceryscout.backend.dto.CartRequest;
-import com.groceryscout.backend.entity.HiddenRecipe;
-import com.groceryscout.backend.entity.Product;
-import com.groceryscout.backend.entity.User;
+import com.groceryscout.backend.entity.*;
 import com.groceryscout.backend.repository.HiddenRecipeRepository;
 import com.groceryscout.backend.repository.ProductRepository;
+import com.groceryscout.backend.repository.RecipeRepository;
 import com.groceryscout.backend.repository.UserRepository;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.domain.Page;
@@ -45,16 +44,19 @@ public class GeminiRecipeService {
 
     private final ObjectMapper objectMapper;
     private final ProductRepository productRepository;
+    private final RecipeRepository recipeRepository;
     private final RestTemplate restTemplate;
     private final HiddenRecipeRepository hiddenRecipeRepository;
     private final UserRepository userRepository;
     private final KafkaEventService kafkaEventService;
 
     public GeminiRecipeService(ObjectMapper objectMapper, ProductRepository productRepository,
-            RestTemplate restTemplate, HiddenRecipeRepository hiddenRecipeRepository, UserRepository userRepository,
+            RecipeRepository recipeRepository, RestTemplate restTemplate,
+            HiddenRecipeRepository hiddenRecipeRepository, UserRepository userRepository,
             KafkaEventService kafkaEventService) {
         this.objectMapper = objectMapper;
         this.productRepository = productRepository;
+        this.recipeRepository = recipeRepository;
         this.restTemplate = restTemplate;
         this.hiddenRecipeRepository = hiddenRecipeRepository;
         this.userRepository = userRepository;
@@ -68,9 +70,9 @@ public class GeminiRecipeService {
      * @param prompt    User's culinary request
      * @param servings  Number of servings required
      * @param userEmail Requesting user's email
-     * @return Generated HiddenRecipe entity
+     * @return Generated Recipe entity
      */
-    public HiddenRecipe generateRecipe(String prompt, int servings, String userEmail) {
+    public Recipe generateRecipe(String prompt, int servings, String userEmail) throws JsonProcessingException {
         String url = String.format(GEMINI_URL, geminiModel, geminiApiKey);
 
         // Reference weights for more accurate AI estimation
@@ -114,6 +116,63 @@ public class GeminiRecipeService {
 
         HttpHeaders headers = new HttpHeaders();
         headers.setContentType(MediaType.APPLICATION_JSON);
+        HttpEntity<String> entity = new HttpEntity<>(objectMapper.writeValueAsString(requestBody), headers);
+
+        ResponseEntity<String> response = restTemplate.postForEntity(url, entity, String.class);
+        String recipeJson = extractJsonFromResponse(response.getBody());
+
+        // Parse Gemini response
+        JsonNode root = objectMapper.readTree(recipeJson);
+        String title = root.path("title").asText("Untitled Recipe");
+        String prepTime = root.path("prepTime").asText("");
+        String difficulty = root.path("difficulty").asText("");
+
+        // Build instructions string
+        StringBuilder instructionsBuilder = new StringBuilder();
+        JsonNode instructionsNode = root.path("instructions");
+        if (instructionsNode.isArray()) {
+            for (int i = 0; i < instructionsNode.size(); i++) {
+                instructionsBuilder.append(i + 1).append(". ").append(instructionsNode.get(i).asText()).append("\n");
+            }
+        }
+
+        // Find user
+        User user = userRepository.findByEmail(userEmail)
+                .orElseThrow(() -> new RuntimeException("User not found"));
+
+        // Create and save Recipe entity
+        Recipe recipe = new Recipe();
+        recipe.setTitle(title);
+        recipe.setInstructions(instructionsBuilder.toString().trim());
+        recipe.setPrepTime(prepTime);
+        recipe.setDifficulty(difficulty);
+        recipe.setCreator(user);
+
+        // Parse and link ingredients
+        List<String> ingredientNames = new ArrayList<>();
+        JsonNode ingredientsNode = root.path("ingredients");
+        if (ingredientsNode.isArray()) {
+            for (JsonNode ingNode : ingredientsNode) {
+                Ingredient ingredient = new Ingredient();
+                String ingName = ingNode.path("name").asText();
+                ingredient.setName(ingName);
+                ingredientNames.add(ingName);
+
+                String qty = ingNode.path("quantity").asText("");
+                int qtyGrams = ingNode.path("quantity_grams").asInt(0);
+                ingredient.setQuantity(qtyGrams > 0 ? qty + " (" + qtyGrams + "g)" : qty);
+
+                // Try to match to a product in inventory
+                Product matched = matchIngredientToProduct(ingName);
+                ingredient.setLinkedProduct(matched);
+
+                ingredient.setRecipe(recipe);
+                recipe.getIngredients().add(ingredient);
+            }
+        }
+
+        Recipe saved = recipeRepository.save(recipe);
+
         // Publish Kafka event
         kafkaEventService.sendRecipeGenerated(saved.getId(), String.join(",", ingredientNames));
 
@@ -230,5 +289,27 @@ public class GeminiRecipeService {
         } catch (Exception e) {
             /* ignore */ }
         return 0;
+    }
+
+    /**
+     * Extracts the recipe JSON string from the Gemini API response.
+     */
+    private String extractJsonFromResponse(String responseBody) throws JsonProcessingException {
+        JsonNode root = objectMapper.readTree(responseBody);
+        String text = root.path("candidates").get(0)
+                .path("content").path("parts").get(0)
+                .path("text").asText();
+
+        // Strip markdown code fences if present
+        text = text.trim();
+        if (text.startsWith("```json")) {
+            text = text.substring(7);
+        } else if (text.startsWith("```")) {
+            text = text.substring(3);
+        }
+        if (text.endsWith("```")) {
+            text = text.substring(0, text.length() - 3);
+        }
+        return text.trim();
     }
 }

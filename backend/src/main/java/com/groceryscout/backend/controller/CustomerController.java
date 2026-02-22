@@ -177,8 +177,13 @@ public class CustomerController {
         if (prompt == null || prompt.isBlank()) {
             return ResponseEntity.badRequest().body(Map.of("error", "Prompt is required"));
         }
+        int servings = 2; // default
         try {
-            Recipe recipe = geminiRecipeService.generateRecipe(prompt, auth.getName());
+            servings = Integer.parseInt(body.getOrDefault("servings", "2"));
+        } catch (NumberFormatException ignored) {
+        }
+        try {
+            Recipe recipe = geminiRecipeService.generateRecipe(prompt, servings, auth.getName());
             return ResponseEntity.ok(recipe);
         } catch (Exception e) {
             return ResponseEntity.internalServerError().body(Map.of("error", e.getMessage()));

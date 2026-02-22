@@ -1,9 +1,11 @@
 import { useState, useEffect } from 'react';
 import api from '../../api/axios';
+import OrderDetailsModal from '../../components/OrderDetailsModal';
 
 export default function ManagerHome() {
     const [stats, setStats] = useState({ totalOrders: 0, pendingOrders: 0, revenue: 0 });
     const [recentOrders, setRecentOrders] = useState([]);
+    const [selectedOrder, setSelectedOrder] = useState(null);
 
     useEffect(() => {
         // Fetch stats
@@ -79,7 +81,11 @@ export default function ManagerHome() {
                                 </tr>
                             ) : (
                                 recentOrders.map(order => (
-                                    <tr key={order.id} className="hover:bg-gray-50 transition-colors">
+                                    <tr
+                                        key={order.id}
+                                        className="hover:bg-green-50 transition-colors cursor-pointer"
+                                        onClick={() => setSelectedOrder(order)}
+                                    >
                                         <td className="px-6 py-4 font-medium text-gray-900">#{order.id}</td>
                                         <td className="px-6 py-4 text-sm text-gray-600">{order.user?.email || 'Guest'}</td>
                                         <td className="px-6 py-4 text-sm text-gray-500">{new Date(order.createdAt).toLocaleDateString()}</td>
@@ -100,6 +106,14 @@ export default function ManagerHome() {
                     </table>
                 </div>
             </div>
+
+            {/* Order Details Modal */}
+            {selectedOrder && (
+                <OrderDetailsModal
+                    order={selectedOrder}
+                    onClose={() => setSelectedOrder(null)}
+                />
+            )}
         </div>
     );
 }

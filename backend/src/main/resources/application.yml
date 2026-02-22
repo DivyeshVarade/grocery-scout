@@ -18,9 +18,10 @@ spring:
     default-property-inclusion: non_null
 
   # Conditional Autoconfiguration
-  autoconfigure:
-    exclude:
-      - org.springframework.boot.autoconfigure.kafka.KafkaAutoConfiguration
+  # Autoconfiguration
+  # autoconfigure:
+  #   exclude:
+  #     - org.springframework.boot.autoconfigure.kafka.KafkaAutoConfiguration
 
 # Session Management
 server:
@@ -40,4 +41,4 @@ app:
 
 # Feature Toggles
 kafka:
-  enabled: false
+  enabled: true
